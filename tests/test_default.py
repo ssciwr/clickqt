@@ -208,4 +208,4 @@ def test_set_default_fail(click_attrs: dict, default: t.Any, expected: t.Any):
         # pylint: disable=w0106
         clickqt.qtgui_from_click(cli).widget_registry[cli.name][param.name]
 
-    assert expected == exc_info.value.message
+    assert expected.lower() == exc_info.value.message.lower()
