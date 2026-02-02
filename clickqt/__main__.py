@@ -76,15 +76,10 @@ def get_entrypoints_from_name(epname: str) -> list[metadata.EntryPoint]:
     """
     Returns the entrypoints that include `epname` in their name.
     """
-    grouped_eps = metadata.entry_points()
-    candidates: list[metadata.EntryPoint] = []
-    for group in grouped_eps.values():
-        for entrypoint in group:
-            if entrypoint.name == epname:
-                return [entrypoint]
-            if epname in entrypoint.name or epname in entrypoint.value:
-                candidates.append(entrypoint)
-    return candidates
+    eps = metadata.entry_points()
+    return list(eps.select(name=epname))
+    # TODO This is also had some logic to determine and recommend "similar"
+    #      commands, but it broke and I had to quick-fix it. Could be readded.
 
 
 def get_gui_specs_from_entrypoint(epname: str):
