@@ -60,6 +60,10 @@ class ConfirmationWidget(BaseWidget):
         :attr:`~clickqt.widgets.confirmationwidget.ConfirmationWidget.confirmation_field` according to :func:`~clickqt.widgets.basewidget.BaseWidget.set_value`.
         """
 
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
+
         if value is not None:
             self.field.set_value(value)
             self.confirmation_field.set_value(value)

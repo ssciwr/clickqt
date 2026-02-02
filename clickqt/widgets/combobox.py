@@ -29,6 +29,10 @@ class ComboBox(ComboBoxBase):
             self.set_value(default)
 
     def set_value(self, value: t.Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
+    
         self.widget.setCurrentText(
             str(
                 self.type.convert(
@@ -64,6 +68,10 @@ class CheckableComboBox(ComboBoxBase):
             self.set_value(BaseWidget.get_param_default(param, []))
 
     def set_value(self, value: t.Iterable[t.Any]):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = []
+
         check_values: list[str] = []
         for v in value:
             check_values.append(

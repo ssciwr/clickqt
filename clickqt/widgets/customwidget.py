@@ -42,4 +42,7 @@ class CustomWidget(BaseWidget):
         return self.getter(self)
 
     def set_value(self, value: Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
         return self.setter(self, value)

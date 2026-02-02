@@ -43,6 +43,9 @@ class TextField(BaseWidget):
                 self.set_value(BaseWidget.get_param_default(param, ""))
 
     def set_value(self, value: t.Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
         if value is None:
             self.set_enabled_changeable(enabled=False)
             return
@@ -102,6 +105,9 @@ class PathField(TextField):
         self.layout.addWidget(input_btn_container)
 
     def set_value(self, value: t.Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
         if isinstance(value, BufferedReader):
             self.widget.setText("-")
         elif isinstance(value, TextIOWrapper):

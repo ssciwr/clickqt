@@ -75,6 +75,9 @@ class DateTimeEdit(BaseWidget):
 
     def set_value(self, value: t.Any):
         """Sets the value of the Qt-widget according to the selected format stored in :attr:`~clickqt.widgets.datetimeedit.DateTimeEdit.format_group`."""
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
         # value -> datetime -> str -> QDateTime
         self.widget.setDateTime(
             QDateTime.fromString(

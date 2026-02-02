@@ -192,6 +192,10 @@ class NValueWidget(MultiWidget):
         :param value: The list of new values that should be stored in the (child-)widgets
         """
 
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = []
+
         if len(value) < len(self.children):  # Remove pairs
             for btns in list(self.buttondict.keys())[len(value) :]:
                 self.remove_button_pair(btns)

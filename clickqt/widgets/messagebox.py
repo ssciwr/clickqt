@@ -42,6 +42,9 @@ class MessageBox(BaseWidget):
         self.container.setVisible(False)
 
     def set_value(self, value: t.Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = False
         self.yes = bool(
             self.type.convert(
                 str(value), self.click_command, click.Context(self.click_command)

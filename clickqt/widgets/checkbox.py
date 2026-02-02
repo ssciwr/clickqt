@@ -50,6 +50,10 @@ class CheckBox(BaseWidget):
         )
 
     def set_value(self, value: t.Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = None
+
         if self.param.to_info_dict().get("is_flag", False):
             self.set_enabled_changeable(value)
         else:

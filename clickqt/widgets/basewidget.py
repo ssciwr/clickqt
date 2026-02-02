@@ -313,6 +313,10 @@ class NumericField(BaseWidget):
     """
 
     def set_value(self, value: t.Any):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = 0
+
         self.widget.setValue(
             self.type.convert(
                 value=str(value),
@@ -408,6 +412,10 @@ class MultiWidget(BaseWidget):
             child.label.setText(label_text + (":" if label_text else ""))
 
     def set_value(self, value: t.Iterable[t.Any]):
+        from click._utils import Sentinel
+        if isinstance(value, Sentinel):
+            value = []
+
         self.set_enabled_changeable(enabled=value is None or len(value) > 0)
         if len(value) != self.param.nargs:
             raise click.BadParameter(
