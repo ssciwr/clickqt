@@ -19,7 +19,7 @@ maintainers = [
     { name = "Dominic Kempf", email = "ssc@iwr.uni-heidelberg.de" },
 ]
 dynamic = ["version"]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
