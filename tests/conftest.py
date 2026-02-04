@@ -11,7 +11,7 @@ from click.testing import CliRunner
 
 
 @pytest.fixture(scope="function")
-def runner(request):
+def runner():
     """Uses the default runner"""
     return CliRunner()
 

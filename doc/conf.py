@@ -1,3 +1,6 @@
+import os
+import shutil
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -8,6 +11,7 @@
 # -- Project information -----------------------------------------------------
 
 project = "clickqt"
+# pylint: disable-next=redefined-builtin
 copyright = "2022, Dominic Kempf"
 author = "Dominic Kempf"
 
@@ -51,13 +55,8 @@ html_theme = "sphinx_rtd_theme"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-# Copy readme_resources images into documentation so they show up when
-# markdown files with relative paths are transcluded
-import os
-import shutil
 
-
-def copy_readme_resources(app, docname=None):
+def copy_readme_resources(app):
     if app.builder.name == "html":
         output_dir = os.path.join(app.outdir, "readme_resources")
         source_dir = os.path.join(app.srcdir, "..", "readme_resources")
