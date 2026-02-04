@@ -90,7 +90,9 @@ def evaluate(
         ),
     ],
 )
-def test_focus_out_validation(click_attrs: dict, invalid_value: t.Any, valid_value: t.Any):
+def test_focus_out_validation(
+    click_attrs: dict, invalid_value: t.Any, valid_value: t.Any
+):
     param = click.Option(param_decls=["--test"], **click_attrs)
     cli = click.Command("cli", params=[param])
 

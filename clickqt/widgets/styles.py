@@ -25,6 +25,7 @@ def BLOB_BUTTON_STYLE_DISABLED(btnsizehalfpx: int):
         }}
     """
 
+
 def BLOB_BUTTON_STYLE_ENABLED_FORCED(btnsizehalfpx: int):
     return f"""
         QToolButton {{
@@ -37,6 +38,7 @@ def BLOB_BUTTON_STYLE_ENABLED_FORCED(btnsizehalfpx: int):
             background-color: #898;
         }}
     """
+
 
 def BLOB_BUTTON_STYLE_DISABLED_FORCED(btnsizehalfpx: int):
     return f"""

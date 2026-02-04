@@ -66,9 +66,14 @@ class FocusOutValidator(QWidget):
             # Don't consider callbacks because we have only one child here
             widget.handle_valid(True)
             return (ret_val, ClickQtError())
-        except Exception as e: # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-exception-caught
             widget.handle_valid(False)
-            return (None, ClickQtError(ClickQtError.ErrorType.CONVERTING_ERROR, widget.widget_name, e))
+            return (
+                None,
+                ClickQtError(
+                    ClickQtError.ErrorType.CONVERTING_ERROR, widget.widget_name, e
+                ),
+            )
 
     def __val(self, widget: BaseWidget) -> tuple[t.Any, ClickQtError]:
         """Calls get_value() on the widget with no parent."""

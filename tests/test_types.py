@@ -225,8 +225,7 @@ def test_type_assignment_multiple_commands(
     control = clickqt.qtgui_from_click(group)
     for i, cli_name in enumerate(control.widget_registry.keys()):
         for j, v in enumerate(control.widget_registry[cli_name].values()):
-            # pylint disable=unidiomatic-typecheck
-            assert type(v) is expected_clickqt_type_list[i][j]  # Perfect type match
+            assert isinstance(v, expected_clickqt_type_list[i][j])  # Perfect type match
 
 
 def test_passwordfield_showPassword():

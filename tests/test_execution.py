@@ -13,13 +13,12 @@ import clickqt.widgets
 from clickqt.core.error import ClickQtError
 from tests.testutils import ClickAttrs, clcoancl, raise_, wait_process_Events
 
-clickqt_res: t.Any = None
+STATE: dict[str, t.Any] = {"clickqt_res": None}
 
 
 def callback(p):
-    global clickqt_res
-    if clickqt_res is None:
-        clickqt_res = p
+    if STATE["clickqt_res"] is None:
+        STATE["clickqt_res"] = p
     return p
 
 
@@ -46,7 +45,7 @@ def prepare_execution(
         )  # value, ok
 
     args: str = ""
-    input = None
+    user_input = None
 
     if widget.param.multiple:
 
@@ -81,9 +80,9 @@ def prepare_execution(
         else:
             args = f"--p={str(value)}"
     else:  # widget is MessageBox
-        input = "y" if value else "n"
+        user_input = "y" if value else "n"
 
-    return (args, input)
+    return (args, user_input)
 
 
 @pytest.mark.parametrize(
@@ -223,8 +222,6 @@ def test_execution(
     value: t.Any,
     error: ClickQtError,
 ):
-    global clickqt_res
-
     param = click.Option(param_decls=["--p"], **click_attrs)
     cli = click.Command("cli", params=[param], callback=callback)
 
@@ -304,10 +301,10 @@ def test_execution(
             else:
                 assert click_res.exception is None
 
-            clickqt_res = None  # Reset the stored click result
+            STATE["clickqt_res"] = None  # Reset the stored click result
             control.gui.run_button.click()
             wait_process_Events(1)  # Wait for worker thread to finish the execution
-            val = clickqt_res
+            val = STATE["clickqt_res"]
 
 
 @pytest.mark.parametrize(
@@ -359,7 +356,6 @@ def test_execution_nvalue_widget(
     value: t.Sequence[str],
     envvar_values: t.Sequence[str],
 ):
-    global clickqt_res
     os.environ["TEST_CLICKQT_ENVVAR"] = os.path.pathsep.join(envvar_values)
 
     param = click.Option(
@@ -373,18 +369,18 @@ def test_execution_nvalue_widget(
     widget.set_value(value)
 
     val, err = widget.get_value()
-    args, input = prepare_execution(monkeypatch=None, value=value, widget=widget)
-    click_res = runner.invoke(cli, args, input, standalone_mode=False)
+    args, user_input = prepare_execution(monkeypatch=None, value=value, widget=widget)
+    click_res = runner.invoke(cli, args, user_input, standalone_mode=False)
     for i in range(2):
         assert val == click_res.return_value
 
         if i == 0:
             assert err.type == ClickQtError.ErrorType.NO_ERROR
 
-            clickqt_res = None  # Reset the stored click result
+            STATE["clickqt_res"] = None  # Reset the stored click result
             control.gui.run_button.click()
             wait_process_Events(1)  # Wait for worker thread to finish the execution
-            val = clickqt_res
+            val = STATE["clickqt_res"]
 
 
 def test_execution_context():
@@ -419,6 +415,7 @@ def test_execution_expose_value_kwargs():
     clickqt_res: dict = None
 
     def f(p1, **kwargs):
+        _ = p1
         nonlocal clickqt_res
         clickqt_res = kwargs
 

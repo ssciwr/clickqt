@@ -125,6 +125,7 @@ def test_set_envvar_fail(
     cli = click.Command("cli", params=[param])
 
     with pytest.raises(click.exceptions.BadParameter) as exc_info:
+        # pylint: disable=expression-not-assigned
         clickqt.qtgui_from_click(cli).widget_registry[cli.name][param.name]
 
     assert expected == exc_info.value.message

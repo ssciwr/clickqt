@@ -1,3 +1,4 @@
+# pylint: disable=cyclic-import
 from __future__ import annotations
 
 import inspect

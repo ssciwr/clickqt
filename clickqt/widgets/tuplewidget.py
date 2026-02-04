@@ -39,7 +39,9 @@ class TupleWidget(MultiWidget):
 
         self.widget.setLayout(QHBoxLayout())
 
-        for i, child_type in enumerate(otype.types if hasattr(otype, "types") else otype):
+        for i, child_type in enumerate(
+            otype.types if hasattr(otype, "types") else otype
+        ):
             nargs = self.param.nargs
             self.param.nargs = 1
             bw: BaseWidget = widgetsource(
