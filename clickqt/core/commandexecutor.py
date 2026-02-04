@@ -4,7 +4,7 @@ import sys
 import typing as t
 import traceback
 import click
-from PySide6.QtCore import Signal, QObject, Slot
+from PySide6.QtCore import Signal, QObject, Slot, QThread
 
 
 class CommandExecutor(QObject):
@@ -28,11 +28,13 @@ class CommandExecutor(QObject):
         click.globals.push_context(ctx)
 
         for task in tasks:
+            if QThread.currentThread().isInterruptionRequested():
+                break
             try:
                 task()
             except SystemExit as e:
                 print(f"SystemExit-Exception, return code: {e.code}", file=sys.stderr)
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception:  # pylint: disable=broad-exception-caught
                 traceback.print_exc(file=sys.stderr)
 
         self.finished.emit()

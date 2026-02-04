@@ -452,18 +452,21 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
     def stop_execution(self):
         """Qt-Slot, which stops the execution of the command(-hierarchy) which is currently running."""
 
+        if self.worker_thread is None:
+            return
         print("Execution stopped!", file=sys.stderr)
-        self.worker_thread.terminate()
-        self.execution_finished()
+        self.worker_thread.requestInterruption()
+        self.gui.stop_button.setEnabled(False)
 
     @Slot()
     def execution_finished(self):
         """Qt-Slot, which deletes the internal worker-object and resets the buttons of the GUI.
         This slot is automatically executed when the execution of a command has finished.
         """
-
-        self.worker_thread.deleteLater()
-        self.worker.deleteLater()
+        if self.worker_thread is not None:
+            self.worker_thread.deleteLater()
+        if self.worker is not None:
+            self.worker.deleteLater()
 
         self.worker_thread = None
         self.worker = None
