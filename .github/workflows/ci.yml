@@ -50,4 +50,7 @@ jobs:
         python -m pip install --no-cache-dir .
 
     - name: Run Python tests
+      env:
+        QT_QPA_PLATFORM: offscreen
+        PYTHONFAULTHANDLER: "1"
       run: python -m pytest
