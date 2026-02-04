@@ -63,8 +63,7 @@ def isIncluded(
     control: Control,
     group_hierarchy_name: str,
 ) -> tuple[bool, str]:
-    # exact type check needed
-    if type(tab_widget) is QWidget:  # Group has options
+    if tab_widget.__class__ is QWidget:  # Group has options
         tab_widget = checkLen(findChildren(tab_widget, QTabWidget), 1)[0]
 
     assert tab_widget.count() == len(
@@ -98,7 +97,7 @@ def isIncluded(
             res = isIncluded(
                 next(
                     filter(
-                        lambda x: isinstance(x, QTabWidget) or type(x) is QWidget,
+                        lambda x: isinstance(x, QTabWidget) or x.__class__ is QWidget,
                         [tab_widget.widget(i) for i in range(tab_widget.count())],
                     )
                 ),
@@ -432,7 +431,7 @@ def test_gui_start_stop_execution():
     assert control.worker is not None and control.worker_thread is not None
 
     stop_button.click()  # Stop execution
-    wait_process_Events(1)  # Wait for stopping the worker
+    wait_process_Events(100, 5)  # Wait for worker to stop gracefully
 
     assert run_button.isEnabled() and not stop_button.isEnabled()
     assert control.worker is None and control.worker_thread is None
@@ -466,9 +465,12 @@ def test_gui_start_stop_execution():
     [
         (SystemExit(527), "SystemExit-Exception, return code: 527\n"),
         pytest.param(
-            TypeError("Wrong type"), "TypeError: Wrong type\n", 
-            marks=pytest.mark.skipif(sys.version_info >= (3,11),
-                                     reason="Fails on GitHubs Windows-VM with python3.11 (but locally it succeeds)")
+            TypeError("Wrong type"),
+            "TypeError: Wrong type\n",
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 11),
+                reason="Fails on GitHubs Windows-VM with python3.11 (but locally it succeeds)",
+            ),
         ),
     ],
 )

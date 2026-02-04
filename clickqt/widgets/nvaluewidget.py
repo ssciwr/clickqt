@@ -45,9 +45,12 @@ class NValueWidget(MultiWidget):
         self.vbox.setLayout(QVBoxLayout())
         self.widget.setWidgetResizable(True)
         addfieldbtn = QPushButton("+", self.widget)
+
+        def add_empty_widget():
+            self.add_pair()
+
         # Add an empty widget
-        addfieldbtn.clicked.connect(lambda: self.add_pair()
-        )  # pylint: disable=unnecessary-lambda
+        addfieldbtn.clicked.connect(add_empty_widget)
         self.vbox.layout().addWidget(addfieldbtn)
         self.widget.setWidget(self.vbox)
         self.buttondict: dict[QPushButton, BaseWidget] = {}
@@ -191,6 +194,8 @@ class NValueWidget(MultiWidget):
 
         :param value: The list of new values that should be stored in the (child-)widgets
         """
+        if value is None:
+            value = []
 
         if len(value) < len(self.children):  # Remove pairs
             for btns in list(self.buttondict.keys())[len(value) :]:

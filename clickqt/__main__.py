@@ -11,6 +11,21 @@ from clickqt.core.control import Control
 from clickqt.core.core import qtgui_from_click
 
 
+def _iter_entry_points():
+    """
+    Iterate over entry points across importlib.metadata variants.
+
+    Python 3.10 returns SelectableGroups, newer versions return EntryPoints.
+    """
+    entry_points = metadata.entry_points()
+    groups = getattr(entry_points, "groups", None)
+    if groups is not None:
+        for group in groups:
+            yield from entry_points.select(group=group)
+        return
+    yield from entry_points
+
+
 @click.command("clickqtfy")
 @click.argument("entrypoint")
 @click.argument("funcname", default=None, required=False)
@@ -76,14 +91,12 @@ def get_entrypoints_from_name(epname: str) -> list[metadata.EntryPoint]:
     """
     Returns the entrypoints that include `epname` in their name.
     """
-    grouped_eps = metadata.entry_points()
     candidates: list[metadata.EntryPoint] = []
-    for group in grouped_eps.values():
-        for entrypoint in group:
-            if entrypoint.name == epname:
-                return [entrypoint]
-            if epname in entrypoint.name or epname in entrypoint.value:
-                candidates.append(entrypoint)
+    for entrypoint in _iter_entry_points():
+        if entrypoint.name == epname:
+            return [entrypoint]
+        if epname in entrypoint.name or epname in entrypoint.value:
+            candidates.append(entrypoint)
     return candidates
 
 

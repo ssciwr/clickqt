@@ -6,6 +6,11 @@ from functools import reduce
 import re
 import inspect
 import click
+
+try:
+    from click.shell_completion import split_arg_string
+except ImportError:  # pragma: no cover - compatibility with older click
+    from click.parser import split_arg_string
 from click_option_group._core import _GroupTitleFakeOption, GroupedOption
 from PySide6.QtWidgets import (
     QWidget,
@@ -23,13 +28,14 @@ from PySide6.QtGui import QPalette, QClipboard
 
 from clickqt.core.gui import GUI
 from clickqt.core.commandexecutor import CommandExecutor
+from clickqt.core.defaults import has_explicit_default, has_truthy_default
 from clickqt.core.error import ClickQtError
 from clickqt.widgets.basewidget import BaseWidget
 from clickqt.widgets.messagebox import MessageBox
 from clickqt.widgets.filefield import FileField
 
 
-class Control(QObject):
+class Control(QObject):  # pylint: disable=too-many-public-methods
     """Regulates the creation of the GUI with their widgets according to clicks parameter types and causes the execution/abortion of a selected command.
 
     :param cmd: The callback function from which a GUI should be created
@@ -206,6 +212,7 @@ class Control(QObject):
 
         return group_tab_widget
 
+    # pylint: disable-next=too-many-locals,too-many-statements
     def parse_cmd(
         self,
         cmd: click.Command,
@@ -293,9 +300,9 @@ class Control(QObject):
                     ].set_enabled_changeable(
                         enabled=widget_required
                         or (
-                            param.default
+                            has_truthy_default(param)
                             if is_flag
-                            else (widget_required or param.default is not None)
+                            else (widget_required or has_explicit_default(param))
                         ),
                         changeable=not widget_required,
                     )
@@ -316,7 +323,7 @@ class Control(QObject):
                 required=reduce(lambda x, y: x | y.required, switch_names, False),
             )
             default = next(
-                (x.flag_value for x in switch_names if x.default),
+                (x.flag_value for x in switch_names if has_truthy_default(x)),
                 switch_names[0].flag_value,
             )  # First param with default==True is the default
             (required_box if choice.required else optional_box).layout().addWidget(
@@ -445,18 +452,21 @@ class Control(QObject):
     def stop_execution(self):
         """Qt-Slot, which stops the execution of the command(-hierarchy) which is currently running."""
 
+        if self.worker_thread is None:
+            return
         print("Execution stopped!", file=sys.stderr)
-        self.worker_thread.terminate()
-        self.execution_finished()
+        self.worker_thread.requestInterruption()
+        self.gui.stop_button.setEnabled(False)
 
     @Slot()
     def execution_finished(self):
         """Qt-Slot, which deletes the internal worker-object and resets the buttons of the GUI.
         This slot is automatically executed when the execution of a command has finished.
         """
-
-        self.worker_thread.deleteLater()
-        self.worker.deleteLater()
+        if self.worker_thread is not None:
+            self.worker_thread.deleteLater()
+        if self.worker is not None:
+            self.worker.deleteLater()
 
         self.worker_thread = None
         self.worker = None
@@ -594,7 +604,7 @@ class Control(QObject):
         self.gui.terminal_output.clear()
         cmdstr = self.get_clipboard()
         click.echo(f"Importing '{cmdstr}' ...")
-        splitstrs = click.parser.split_arg_string(cmdstr)
+        splitstrs = split_arg_string(cmdstr)
         click.echo(f"Read as: '{splitstrs}' ...")
         error = ClickQtError()
 

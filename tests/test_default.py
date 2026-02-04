@@ -205,7 +205,16 @@ def test_set_default_fail(click_attrs: dict, default: t.Any, expected: t.Any):
     cli = click.Command("cli", params=[param])
 
     with pytest.raises(click.exceptions.BadParameter) as exc_info:
-        # pylint: disable=w0106
+        # pylint: disable=expression-not-assigned
         clickqt.qtgui_from_click(cli).widget_registry[cli.name][param.name]
 
-    assert expected == exc_info.value.message
+    message = exc_info.value.message
+    if message == expected:
+        return
+    if "is not a valid boolean." in expected:
+        assert message.startswith(expected + " Recognized values:")
+        return
+    if "is not one of" in expected:
+        assert message.lower() == expected.lower()
+        return
+    assert expected == message

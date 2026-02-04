@@ -24,10 +24,11 @@ from clickqt.widgets.styles import (
 )
 
 from clickqt.core.error import ClickQtError
+from clickqt.core.defaults import normalize_default, is_unset
 import clickqt.core  # FocusOutValidator
 
 
-class BaseWidget(ABC):
+class BaseWidget(ABC):  # pylint: disable=too-many-instance-attributes
     """Provides basic functionalities and initializes the widget.
     Every clickqt widget has to inherit from this class.
 
@@ -46,9 +47,12 @@ class BaseWidget(ABC):
         param: click.Parameter,
         parent: t.Optional["BaseWidget"] = None,
         **kwargs,
-    ):
+    ):  # pylint: disable=too-many-statements
         assert isinstance(otype, click.ParamType)
         assert isinstance(param, click.Parameter)
+        if is_unset(param.default):
+            # Click >=8.2 uses an UNSET sentinel where clickqt historically expected None.
+            param.default = None
         self.is_enabled = True
         self.can_change_enabled = True
         self.type = otype
@@ -295,12 +299,10 @@ class BaseWidget(ABC):
     def get_param_default(param: click.Parameter, alternative: t.Any = None):
         """Returns the default value of **param**. If there is no default value, **alternative** will be returned."""
 
-        # TODO: Replace with param.get_default(ctx=click.Context(command), call=True)
-        if param.default is None:
-            return alternative
-        if callable(param.default):
-            return param.default()
-        return param.default
+        default = param.default
+        if callable(default):
+            default = default()
+        return normalize_default(default, alternative)
 
 
 class NumericField(BaseWidget):
@@ -408,7 +410,11 @@ class MultiWidget(BaseWidget):
             child.label.setText(label_text + (":" if label_text else ""))
 
     def set_value(self, value: t.Iterable[t.Any]):
-        self.set_enabled_changeable(enabled=value is None or len(value) > 0)
+        if value is None:
+            self.set_enabled_changeable(enabled=False)
+            return
+
+        self.set_enabled_changeable(enabled=len(value) > 0)
         if len(value) != self.param.nargs:
             raise click.BadParameter(
                 ngettext(

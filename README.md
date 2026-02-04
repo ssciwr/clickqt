@@ -23,6 +23,8 @@ into
 
 # Installation
 
+`clickqt` requires Python 3.10 or newer.
+
 The Python package `clickqt` can be installed from PyPI:
 
 ```
