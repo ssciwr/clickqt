@@ -77,13 +77,17 @@ def get_entrypoints_from_name(epname: str) -> list[metadata.EntryPoint]:
     Returns the entrypoints that include `epname` in their name.
     """
     grouped_eps = metadata.entry_points()
+    all_eps = (
+        list(grouped_eps)
+        if hasattr(grouped_eps, "select")
+        else [ep for group in grouped_eps.values() for ep in group]
+    )
     candidates: list[metadata.EntryPoint] = []
-    for group in grouped_eps.values():
-        for entrypoint in group:
-            if entrypoint.name == epname:
-                return [entrypoint]
-            if epname in entrypoint.name or epname in entrypoint.value:
-                candidates.append(entrypoint)
+    for entrypoint in all_eps:
+        if entrypoint.name == epname:
+            return [entrypoint]
+        if epname in entrypoint.name or epname in entrypoint.value:
+            candidates.append(entrypoint)
     return candidates
 
 

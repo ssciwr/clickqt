@@ -27,7 +27,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "click",
+    "click>=8,<9",
     "click_option_group",
     "PySide6",
     "qt-collapsible-section-pyside6",
