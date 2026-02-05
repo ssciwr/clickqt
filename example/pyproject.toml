@@ -21,17 +21,25 @@ classifiers = [
 dependencies = [
     "click",
     "clickqt",
+    "click-option-group",
 ]
 
 # This is the CLI
 [project.scripts]
-example_cli = "example.__main__:utilgroup"
+example_cli = "example.__main__:example_cli"
+example_bio_hello_cli = "example.apps.hello_world:lab_greeter"
+example_bio_pcr_cli = "example.apps.realistic_app:pcr_plate_planner"
+example_bio_rnaseq_cli = "example.apps.full_showcase:rnaseq_pipeline_configurator"
 
 # This is the gui
 [project.gui-scripts]
-example_gui = "example.__main__:gui"
+example_gui = "example.__main__:example_gui"
+example_bio_hello_gui = "example.apps.hello_world:hello_gui"
+example_bio_pcr_gui = "example.apps.realistic_app:pcr_gui"
+example_bio_rnaseq_gui = "example.apps.full_showcase:rnaseq_gui"
 
 [tool.setuptools]
 packages = [
     "example",
+    "example.apps",
 ]
