@@ -414,14 +414,14 @@ def test_confirmation_widget_returns_deterministic_conversion_error(tmp_path):
     val, err = widget.get_value()
     assert val is None
     assert err.type == ClickQtError.ErrorType.CONVERTING_ERROR
-    assert invalid_second in err.message()
+    assert os.path.basename(invalid_second) in err.message()
 
     widget.field.set_value(invalid_first)
     widget.confirmation_field.set_value(invalid_second)
     val, err = widget.get_value()
     assert val is None
     assert err.type == ClickQtError.ErrorType.CONVERTING_ERROR
-    assert invalid_first in err.message()
+    assert os.path.basename(invalid_first) in err.message()
 
 
 @pytest.mark.parametrize(
