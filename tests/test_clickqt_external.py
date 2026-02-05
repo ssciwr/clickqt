@@ -161,6 +161,7 @@ def test_clickqtfy_uses_path_resolvers_for_file_inputs(monkeypatch, tmp_path):
     assert captured["kwargs"] == {
         "custom_mapping": custom_mapping,
         "application_name": f"{path} - main",
+        "invocation_command": f"python {path}",
     }
 
 
@@ -211,6 +212,7 @@ def test_clickqtfy_uses_entrypoint_resolvers_for_installed_entrypoints(monkeypat
     assert captured["kwargs"] == {
         "custom_mapping": custom_mapping,
         "application_name": "cli-ep",
+        "invocation_command": "cli-ep",
     }
 
 
@@ -234,7 +236,10 @@ def test_clickqtfy_without_custom_gui_uses_default_mapping(monkeypatch):
     assert control.is_ep is True
     assert control.ep_or_path == "cli-ep"
     assert captured["command"] is cmd
-    assert captured["kwargs"] == {"application_name": "cli-ep"}
+    assert captured["kwargs"] == {
+        "application_name": "cli-ep",
+        "invocation_command": "cli-ep",
+    }
 
 
 def test_get_command_from_entrypoint_raises_for_missing_exact_match(monkeypatch):

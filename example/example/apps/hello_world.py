@@ -49,6 +49,7 @@ def hello_gui():
     clickqt.qtgui_from_click(
         lab_greeter,
         application_name="ClickQt Bio Lab Greeter",
+        invocation_command="example_bio_hello_cli",
     )()
 
 

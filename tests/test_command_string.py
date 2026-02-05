@@ -128,3 +128,17 @@ def test_command(eptype: EPTYPE, click_attrs: dict, value: t.Any, expected_param
     # Simulate clipboard behavior using QApplication.clipboard()
     clipboard = QApplication.clipboard()
     assert clipboard.text(QClipboard.Clipboard) == expected_output
+
+
+def test_command_uses_explicit_invocation_command():
+    param = click.Option(param_decls=["--p"], required=True, type=click.STRING)
+    cli = click.Command("main", params=[param])
+    control = clickqt.qtgui_from_click(cli, invocation_command="uv run bio-cli")
+    control.set_is_ep(True)
+
+    widget = control.widget_registry[cli.name][param.name]
+    widget.set_value("value")
+    control.construct_command_string()
+
+    clipboard = QApplication.clipboard()
+    assert clipboard.text(QClipboard.Clipboard) == "uv run bio-cli --p value"

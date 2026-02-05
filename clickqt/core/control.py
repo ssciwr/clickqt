@@ -50,6 +50,7 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
         custom_mapping: dict = None,
         is_ep: bool = True,
         ep_or_path: str = " ",
+        invocation_command: t.Optional[str] = None,
     ):
         """Initializing the GUI object and the registries together with the differentiation of a group command and a simple command."""
 
@@ -60,6 +61,7 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
 
         self.is_ep = is_ep
         self.ep_or_path = ep_or_path
+        self.invocation_command = invocation_command
 
         self.custom_mapping = custom_mapping
         if self.custom_mapping is not None and len(self.custom_mapping) >= 1:
@@ -419,7 +421,23 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
         hierarchy_selected_command_name = self.clean_command_string(
             self.cmd.name, hierarchy_selected_command_name
         )
-        return self.ep_or_path + " " + hierarchy_selected_command_name
+        invocation_tokens = self.get_invocation_tokens()
+        invocation = " ".join(invocation_tokens)
+        return f"{invocation} {hierarchy_selected_command_name}".strip()
+
+    def get_invocation_tokens(self) -> list[str]:
+        """Returns the command prefix used for clipboard command construction and import."""
+        if self.invocation_command is not None and self.invocation_command.strip():
+            return split_arg_string(self.invocation_command)
+
+        stripped_ep_or_path = self.ep_or_path.strip()
+        if self.is_ep:
+            return [stripped_ep_or_path] if stripped_ep_or_path else []
+
+        tokens = ["python"]
+        if stripped_ep_or_path:
+            tokens.append(stripped_ep_or_path)
+        return tokens
 
     def hierarchy_to_str(self, command_hierarchy: list[str]) -> str:
         assert isinstance(command_hierarchy, list)
@@ -432,21 +450,100 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
         widgets = list(self.widget_registry[hierarchy_str].values())
         for widget in filter(lambda widget: widget.is_enabled, widgets):
             param_strings += widget.get_widget_value_cmdline()
-        msgpieces = []
+        msgpieces = self.get_invocation_tokens()
+        hierarchy_tokens = command_hierarchy[:]
         if self.is_ep:
-            command_hierarchy = command_hierarchy[1:]
+            hierarchy_tokens = hierarchy_tokens[1:]
         if not self.is_ep:
             if (
                 isinstance(self.cmd, click.Group)
-                and command_hierarchy[0] == self.cmd.name
+                and hierarchy_tokens
+                and hierarchy_tokens[0] == self.cmd.name
             ):
-                command_hierarchy = command_hierarchy[1:]
-            msgpieces.append("python")
-        msgpieces.append(self.ep_or_path)
-        msgpieces.extend(command_hierarchy)
+                hierarchy_tokens = hierarchy_tokens[1:]
+        msgpieces.extend(hierarchy_tokens)
         msgpieces.append(param_strings)
         msg = " ".join(msgpieces).strip()
         return msg
+
+    def get_import_candidates(self, splitstrs: list[str]) -> list[list[str]]:
+        """
+        Returns command-line token candidates to parse, with and without a known invocation prefix.
+        """
+        invocation_prefixes: list[list[str]] = []
+        invocation_tokens = self.get_invocation_tokens()
+        if invocation_tokens:
+            invocation_prefixes.append(invocation_tokens)
+
+        legacy_prefix: list[str] = []
+        stripped_ep_or_path = self.ep_or_path.strip()
+        if self.is_ep and stripped_ep_or_path:
+            legacy_prefix = [stripped_ep_or_path]
+        if not self.is_ep:
+            legacy_prefix = ["python"]
+            if stripped_ep_or_path:
+                legacy_prefix.append(stripped_ep_or_path)
+        if legacy_prefix and legacy_prefix not in invocation_prefixes:
+            invocation_prefixes.append(legacy_prefix)
+
+        candidates: list[list[str]] = [splitstrs]
+        for prefix in invocation_prefixes:
+            if len(splitstrs) >= len(prefix) and splitstrs[: len(prefix)] == prefix:
+                candidate = splitstrs[len(prefix) :]
+                if candidate not in candidates:
+                    candidates.append(candidate)
+
+        return candidates
+
+    def resolve_import_command(
+        self, splitstrs: list[str]
+    ) -> tuple[list[str], list[str], click.Command]:
+        """
+        Resolve command hierarchy and argument tokens from a tokenized command line.
+        """
+        hierarchystrs: list[str] = []
+        args_with_command = splitstrs[:]
+        cmd: click.Command = self.cmd
+
+        if args_with_command and args_with_command[0] == self.cmd.name:
+            args_with_command = args_with_command[1:]
+
+        while isinstance(cmd, click.Group) and args_with_command:
+            subcommand = cmd.get_command(ctx=None, cmd_name=args_with_command[0])
+            if subcommand is None:
+                break
+            hierarchystrs.append(args_with_command[0])
+            args_with_command = args_with_command[1:]
+            cmd = subcommand
+
+        return hierarchystrs, args_with_command, cmd
+
+    def parse_import_candidate(
+        self, splitstrs_candidate: list[str]
+    ) -> t.Optional[tuple[list[str], list[str], click.Context, dict[str, BaseWidget]]]:
+        """
+        Parse a command-line candidate and resolve the corresponding widget mapping.
+        """
+        hierarchystrs, splitstrs_without_command, cmd = self.resolve_import_command(
+            splitstrs_candidate
+        )
+        ctx = click.Context(cmd)
+        try:
+            cmd.parse_args(ctx, splitstrs_without_command[:])
+        except click.ClickException:
+            return None
+
+        commandstr = self.hierarchy_to_str(hierarchystrs)
+        registry_key = self.cmd.name + ":" + commandstr if commandstr else self.cmd.name
+        if registry_key not in self.widget_registry:
+            return None
+
+        return (
+            hierarchystrs,
+            splitstrs_without_command,
+            ctx,
+            self.widget_registry[registry_key],
+        )
 
     @Slot()
     def stop_execution(self):
@@ -606,50 +703,44 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
         click.echo(f"Importing '{cmdstr}' ...")
         splitstrs = split_arg_string(cmdstr)
         click.echo(f"Read as: '{splitstrs}' ...")
-        error = ClickQtError()
+        hierarchystrs: list[str] = []
+        splitstrs_without_command: list[str] = []
+        ctx: t.Optional[click.Context] = None
+        relevant_widgets: t.Optional[dict[str, BaseWidget]] = None
 
-        # sanity checks
-        if self.is_ep:
-            if len(splitstrs) == 0 or splitstrs[0] != self.ep_or_path:
-                error = ClickQtError(
-                    ClickQtError.ErrorType.PROCESSING_VALUE_ERROR,
-                    "Cannot import due to missing or wrong entry point name",
-                )
-        elif (
-            len(splitstrs) <= 3
-            or splitstrs[0] != "python"
-            or splitstrs[1] != self.ep_or_path
-            or (not isinstance(self.cmd, click.Group) and splitstrs[2] != self.cmd.name)
-        ):
+        for splitstrs_candidate in self.get_import_candidates(splitstrs):
+            parsed_candidate = self.parse_import_candidate(splitstrs_candidate)
+            if parsed_candidate is None:
+                continue
+
+            (
+                hierarchystrs,
+                splitstrs_without_command,
+                ctx,
+                relevant_widgets,
+            ) = parsed_candidate
+            click.echo(f"Arguments w/ command: {splitstrs_candidate}")
+            click.echo(f"Set tabs to: '{hierarchystrs}' from '{splitstrs_candidate}'")
+            click.echo(f"Arguments w/o command: {splitstrs_without_command}")
+            break
+
+        if ctx is None or relevant_widgets is None:
+            error_message = (
+                "Cannot import due to missing or wrong entry point name"
+                if self.is_ep
+                else "Cannot import due to missing or wrong file/function combination"
+            )
             error = ClickQtError(
                 ClickQtError.ErrorType.PROCESSING_VALUE_ERROR,
-                "Cannot import due to missing or wrong file/function combination",
+                error_message,
             )
-        if self.check_error(error):
+            self.check_error(error)
             return
-        if self.is_ep:
-            splitstrs.pop(0)
-        else:
-            splitstrs = splitstrs[2:]
-            if not isinstance(self.cmd, click.Group) and splitstrs[0] == self.cmd.name:
-                splitstrs = splitstrs[1:]
-        click.echo(f"Arguments w/ command: {splitstrs}")
-        hierarchystrs, _ = self.select_current_command_hierarchy(splitstrs)
-        click.echo(f"Set tabs to: '{hierarchystrs}' from '{splitstrs}'")
-        for hierarchystr in hierarchystrs:
-            splitstrs.remove(hierarchystr)
-        click.echo(f"Arguments w/o command: {splitstrs}")
-        commandstr = self.hierarchy_to_str(hierarchystrs)
 
-        cmd: click.Group = self.cmd
-        for cmdname in hierarchystrs:
-            cmd = cmd.commands[cmdname]
-        ctx = click.Context(cmd)
-        cmd.parse_args(ctx, splitstrs[:])
-        if commandstr:
-            relevant_widgets = self.widget_registry[self.cmd.name + ":" + commandstr]
-        else:
-            relevant_widgets = self.widget_registry[self.cmd.name]
+        fulfilled_hierarchystrs, _ = self.select_current_command_hierarchy(
+            hierarchystrs
+        )
+        assert fulfilled_hierarchystrs == hierarchystrs
 
         for paramname, paramvalue in ctx.params.items():
             widget = relevant_widgets[paramname]

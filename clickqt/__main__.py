@@ -45,6 +45,7 @@ def clickqtfy(entrypoint, funcname, custom_gui):
     If FUNCNAME is provided, ENTRYPOINT is interpreted as a file. Otherwise, as an entry point.
     """
     appname = entrypoint + (f" - {funcname}" if funcname else "")
+    invocation_command = entrypoint if funcname is None else f"python {entrypoint}"
     gui_specs = None
     command = None
     control = None
@@ -62,10 +63,17 @@ def clickqtfy(entrypoint, funcname, custom_gui):
 
     if gui_specs:
         control = qtgui_from_click(
-            command, custom_mapping=gui_specs, application_name=appname
+            command,
+            custom_mapping=gui_specs,
+            application_name=appname,
+            invocation_command=invocation_command,
         )
     else:
-        control = qtgui_from_click(command, application_name=appname)
+        control = qtgui_from_click(
+            command,
+            application_name=appname,
+            invocation_command=invocation_command,
+        )
     control.set_is_ep(funcname is None)
     control.set_ep_or_path(entrypoint)
     return control()
