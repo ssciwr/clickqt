@@ -146,3 +146,29 @@ def test_option_group_cmd_str_export(value: str, expected_output: str):
     clipboard = QApplication.clipboard()
     print(clipboard.text(QClipboard.Clipboard))
     assert clipboard.text(QClipboard.Clipboard) == expected_output
+
+
+def test_option_group_title_widget_has_no_cli_payload():
+    group = OptionGroup("Group 1")
+
+    @click.command("main")
+    @group.option("--opt1")
+    def cli(**params):
+        print(params)
+
+    control = qtgui_from_click(cli)
+    control.set_ep_or_path("main")
+    control.set_is_ep(True)
+
+    title_param = next(
+        param for param in cli.params if isinstance(param, _GroupTitleFakeOption)
+    )
+    title_widget = control.widget_registry[cli.name][title_param.name]
+    value_widget = control.widget_registry[cli.name]["opt1"]
+    value_widget.set_value("abc")
+
+    title_widget.set_value("ignored")
+
+    assert title_widget.get_widget_value() == ""
+    assert title_widget.get_widget_value_cmdline() == ""
+    assert control.command_to_cli_string([cli.name]) == "main --opt1 abc"

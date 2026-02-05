@@ -5,6 +5,7 @@ import typing as t
 import click
 import pytest
 from PySide6.QtCore import QEvent
+from PySide6.QtGui import QFocusEvent
 
 import clickqt.widgets
 from tests.testutils import ClickAttrs, raise_
@@ -138,3 +139,49 @@ def test_focus_out_validation_child(
     evaluate(
         clickqt_widget, list(clickqt_widget.children)[1], invalid_value, valid_value
     )  # We check the first child
+
+
+def test_basewidget_focus_and_wheel_handlers_respect_focus_state(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    param = click.Option(param_decls=["--test"], **ClickAttrs.intfield())
+    cli = click.Command("cli", params=[param])
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.IntField = control.widget_registry[cli.name][param.name]
+
+    calls = {"wheel": 0, "focus_in": 0}
+
+    class DummyWidgetType:
+        @staticmethod
+        def wheelEvent(_widget, _event):
+            calls["wheel"] += 1
+
+        @staticmethod
+        def focusInEvent(_widget, _event):
+            calls["focus_in"] += 1
+
+    class DummyWheelEvent:
+        def __init__(self):
+            self.ignored = False
+
+        def ignore(self):
+            self.ignored = True
+
+    widget.widget_type = DummyWidgetType
+
+    monkeypatch.setattr(widget.widget, "hasFocus", lambda: False)
+    wheel_event_unfocused = DummyWheelEvent()
+    widget.widget.wheelEvent(wheel_event_unfocused)
+    assert wheel_event_unfocused.ignored is True
+    assert calls["wheel"] == 0
+
+    monkeypatch.setattr(widget.widget, "hasFocus", lambda: True)
+    wheel_event_focused = DummyWheelEvent()
+    widget.widget.wheelEvent(wheel_event_focused)
+    assert wheel_event_focused.ignored is False
+    assert calls["wheel"] == 1
+
+    widget.set_enabled_changeable(enabled=False, changeable=True)
+    widget.widget.focusInEvent(QFocusEvent(QEvent.Type.FocusIn))
+    assert calls["focus_in"] == 1
+    assert widget.is_enabled is True
