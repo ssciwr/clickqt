@@ -31,6 +31,17 @@
 - Add regression tests for bug fixes and widget/type mapping changes.
 - Run the full suite before opening a PR; use targeted runs while iterating.
 
+## Coverage Testing (pytest-cov)
+- Run coverage checks for all code changes; do not treat coverage as optional.
+- Use `pytest-cov` with branch coverage:
+  `python -m pytest --cov=clickqt --cov-branch --cov-report=term-missing --cov-report=xml`
+- Review uncovered lines in the terminal report (`term-missing`) and use `coverage.xml` for precise
+  line-level analysis in tooling.
+- Prioritize tests for changed lines and behavior paths; the goal is very high diff coverage on every
+  change.
+- If coverage drops, add or update tests before merging unless there is a documented, explicit
+  exception.
+
 ## Commit & Pull Request Guidelines
 - Follow existing history style: short, imperative commit subjects (e.g., `Fix import logic for Python 3.12`).
 - Keep commits focused; separate refactors from behavior changes.
