@@ -40,6 +40,7 @@ gui = clickqt.qtgui_from_click(
     bio_suite,
     custom_mapping={},
     application_name="ClickQt Biology Example Suite",
+    invocation_command="example_cli",
 )
 example_gui = gui
 

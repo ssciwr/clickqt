@@ -204,6 +204,7 @@ def rnaseq_gui():
     clickqt.qtgui_from_click(
         rnaseq_pipeline_configurator,
         application_name="ClickQt RNA-seq Pipeline Configurator",
+        invocation_command="example_bio_rnaseq_cli",
     )()
 
 

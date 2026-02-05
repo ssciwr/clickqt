@@ -15,6 +15,7 @@ def qtgui_from_click(
     custom_mapping: t.Optional[dict[click.ParamType, CustomBindingType]] = None,
     application_name: t.Optional[str] = None,
     window_icon: t.Optional[str] = None,
+    invocation_command: t.Optional[str] = None,
 ):
     """This function is used to generate the GUI for a given command. It takes a click command as its argument and returns a Control object
     that contains the GUI, execution logic, and the generated widgets used for the parameters of the command.
@@ -23,6 +24,7 @@ def qtgui_from_click(
     :param custom_mapping: The dictionary containing the customized mapping from a user-defined click type to an intended Qt Widget.
     :param application_name: Name of the application, defaults to None (= 'python')
     :param window_icon: Path to an icon, changes the icon of the application, defaults to None (= no icon)
+    :param invocation_command: Command prefix used for generated/imported command lines, defaults to None (= inferred)
 
     :return: The control-object that contains the GUI
     """
@@ -39,4 +41,4 @@ def qtgui_from_click(
                 }"""
         )
 
-    return Control(cmd, custom_mapping)
+    return Control(cmd, custom_mapping, invocation_command=invocation_command)

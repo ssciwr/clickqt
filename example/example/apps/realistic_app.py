@@ -105,6 +105,7 @@ def pcr_gui():
     clickqt.qtgui_from_click(
         pcr_plate_planner,
         application_name="ClickQt PCR Plate Planner",
+        invocation_command="example_bio_pcr_cli",
     )()
 
 
