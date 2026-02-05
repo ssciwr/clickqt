@@ -615,7 +615,12 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
                     ClickQtError.ErrorType.PROCESSING_VALUE_ERROR,
                     "Cannot import due to missing or wrong entry point name",
                 )
-        elif len(splitstrs) <= 3:
+        elif (
+            len(splitstrs) <= 3
+            or splitstrs[0] != "python"
+            or splitstrs[1] != self.ep_or_path
+            or (not isinstance(self.cmd, click.Group) and splitstrs[2] != self.cmd.name)
+        ):
             error = ClickQtError(
                 ClickQtError.ErrorType.PROCESSING_VALUE_ERROR,
                 "Cannot import due to missing or wrong file/function combination",
@@ -626,6 +631,8 @@ class Control(QObject):  # pylint: disable=too-many-public-methods
             splitstrs.pop(0)
         else:
             splitstrs = splitstrs[2:]
+            if not isinstance(self.cmd, click.Group) and splitstrs[0] == self.cmd.name:
+                splitstrs = splitstrs[1:]
         click.echo(f"Arguments w/ command: {splitstrs}")
         hierarchystrs, _ = self.select_current_command_hierarchy(splitstrs)
         click.echo(f"Set tabs to: '{hierarchystrs}' from '{splitstrs}'")

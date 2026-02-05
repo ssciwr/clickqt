@@ -413,6 +413,69 @@ def test_gui_construction_with_options(root_group_command: click.Command):
         )
 
 
+def test_current_command_hierarchy_for_group_with_params_uses_child_tabs():
+    leaf_cmd = click.Command("leaf", params=[])
+    sub_group = click.Group(
+        "sub",
+        params=[click.Option(param_decls=["--sub-opt"], **ClickAttrs.textfield())],
+        commands=[leaf_cmd, click.Command("other", params=[])],
+    )
+    root_group = click.Group(
+        "root",
+        params=[click.Option(param_decls=["--root-opt"], **ClickAttrs.intfield())],
+        commands=[sub_group, click.Command("top", params=[])],
+    )
+    control = clickqt.qtgui_from_click(root_group)
+
+    root_container = control.gui.widgets_container
+    root_tabs = root_container.findChild(QTabWidget)
+    assert isinstance(root_tabs, QTabWidget)
+    root_tab_labels = [root_tabs.tabText(i) for i in range(root_tabs.count())]
+    root_tabs.setCurrentIndex(root_tab_labels.index("sub"))
+
+    sub_tabs = root_tabs.currentWidget().findChild(QTabWidget)
+    assert isinstance(sub_tabs, QTabWidget)
+    sub_tab_labels = [sub_tabs.tabText(i) for i in range(sub_tabs.count())]
+    sub_tabs.setCurrentIndex(sub_tab_labels.index("leaf"))
+
+    hierarchy = control.current_command_hierarchy(root_container, root_group)
+    assert [command.name for command in hierarchy] == ["root", "sub", "leaf"]
+
+
+def test_select_current_command_hierarchy_handles_partial_and_non_tab_paths():
+    sub_group = click.Group(
+        "sub",
+        commands=[click.Command("leaf", params=[]), click.Command("other", params=[])],
+    )
+    root_group = click.Group(
+        "root",
+        commands=[sub_group, click.Command("top", params=[])],
+    )
+    control = clickqt.qtgui_from_click(root_group)
+
+    fulfilled, widget = control.select_current_command_hierarchy(["sub", "leaf"])
+    assert fulfilled == ["sub", "leaf"]
+    assert not isinstance(widget, QTabWidget)
+
+    top_tabs = control.gui.widgets_container
+    assert isinstance(top_tabs, QTabWidget)
+    assert top_tabs.tabText(top_tabs.currentIndex()) == "sub"
+    sub_tabs = top_tabs.currentWidget()
+    assert isinstance(sub_tabs, QTabWidget)
+    assert sub_tabs.tabText(sub_tabs.currentIndex()) == "leaf"
+
+    fulfilled, widget = control.select_current_command_hierarchy(["sub", "missing"])
+    assert fulfilled == ["sub"]
+    assert isinstance(widget, QTabWidget)
+    assert [widget.tabText(i) for i in range(widget.count())] == ["leaf", "other"]
+
+    fulfilled, widget = control.select_current_command_hierarchy(
+        ["sub", "leaf", "extra"]
+    )
+    assert fulfilled == ["sub", "leaf"]
+    assert not isinstance(widget, QTabWidget)
+
+
 def test_gui_start_stop_execution():
     param = click.Option(param_decls=["--p"], required=True, **ClickAttrs.checkbox())
     cli = click.Command("cli", params=[param], callback=lambda p: QThread.msleep(100))
@@ -458,6 +521,47 @@ def test_gui_start_stop_execution():
 
     assert run_button.isEnabled() and not stop_button.isEnabled()
     assert control.worker is None and control.worker_thread is None
+
+
+def test_stop_execution_without_worker_is_safe_noop():
+    cli = click.Command("cli", params=[])
+    control = clickqt.qtgui_from_click(cli)
+
+    run_button = control.gui.run_button
+    stop_button = control.gui.stop_button
+
+    assert run_button.isEnabled() and not stop_button.isEnabled()
+    assert control.worker is None and control.worker_thread is None
+
+    control.stop_execution()
+
+    assert run_button.isEnabled() and not stop_button.isEnabled()
+    assert control.worker is None and control.worker_thread is None
+    assert "Execution stopped!" not in control.gui.terminal_output.toPlainText()
+
+
+def test_gui_creation_ignores_non_parameter_entries():
+    class NonParameterSentinel:
+        required = False
+        name = "sentinel"
+
+    param = click.Option(param_decls=["--p"], **ClickAttrs.textfield())
+    cli = click.Command("cli", params=[param])
+    cli.params.append(NonParameterSentinel())
+
+    control = clickqt.qtgui_from_click(cli)
+
+    assert set(control.widget_registry[cli.name].keys()) == {param.name}
+    assert set(control.command_registry[cli.name].keys()) == {param.name}
+
+
+def test_set_custom_mapping_updates_control_state():
+    control = clickqt.qtgui_from_click(click.Command("cli", params=[]))
+    custom_mapping = {"custom_type": "custom_widget"}
+
+    control.set_custom_mapping(custom_mapping)
+
+    assert control.custom_mapping == custom_mapping
 
 
 @pytest.mark.parametrize(

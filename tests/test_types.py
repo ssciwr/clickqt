@@ -13,15 +13,91 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
 )
-from PySide6.QtCore import QTimer, Signal, QObject, Qt
+from PySide6.QtCore import QTimer, Signal, QObject, Qt, QEvent, QTimerEvent
+from PySide6.QtGui import QResizeEvent
 from pytestqt.qtbot import QtBot
 
+from clickqt.basedint import BasedIntParamType
+from clickqt.widgets.core import QCheckableComboBox
 from tests.testutils import ClickAttrs
 import clickqt.widgets
+from clickqt.widgets.customwidget import CustomWidget, WidgetNotSupported
 
 
 class CustomParamType(click.ParamType):
     pass
+
+
+def test_widget_not_supported_error_keeps_requested_widget_name():
+    error = WidgetNotSupported("FancyWidget")
+
+    assert error.widget_name == "FancyWidget"
+    assert str(error) == "FancyWidget not supported."
+
+
+def test_custom_widget_uses_binding_getter_and_setter_contract():
+    param = click.Option(["--custom"], type=CustomParamType())
+    cli = click.Command("cli", params=[param])
+    setter_calls = []
+    getter_calls = []
+
+    def getter(widget: CustomWidget):
+        getter_calls.append(widget)
+        return widget.widget.text()
+
+    def setter(widget: CustomWidget, value):
+        setter_calls.append((widget, value))
+        widget.widget.setText(f"{value}-set")
+
+    control = clickqt.qtgui_from_click(
+        cli, custom_mapping={CustomParamType: (QLineEdit, getter, setter)}
+    )
+    widget = control.widget_registry[cli.name][param.name]
+
+    assert isinstance(widget, CustomWidget)
+
+    widget.set_value("abc")
+
+    assert setter_calls == [(widget, "abc")]
+    assert widget.widget.text() == "abc-set"
+    assert widget.get_widget_value() == "abc-set"
+    assert getter_calls == [widget]
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        ("42", 42),
+        ("0x2A", 42),
+        ("052", 42),
+    ],
+)
+def test_based_int_type_convert_supports_decimal_hex_and_octal(
+    raw_value: str, expected: int
+):
+    converter = BasedIntParamType()
+    option = click.Option(["--value"])
+    context = click.Context(click.Command("cmd"))
+
+    assert converter.convert(raw_value, option, context) == expected
+
+
+def test_based_int_type_convert_preserves_existing_integers():
+    converter = BasedIntParamType()
+
+    assert converter.convert(7, None, None) == 7
+
+
+@pytest.mark.parametrize("raw_value", ["invalid", "09"])
+def test_based_int_type_convert_raises_bad_parameter_for_invalid_value(raw_value: str):
+    converter = BasedIntParamType()
+    option = click.Option(["--value"])
+    context = click.Context(click.Command("cmd"))
+
+    with pytest.raises(click.BadParameter) as excinfo:
+        converter.convert(raw_value, option, context)
+
+    assert "not a valid integer" in str(excinfo.value)
 
 
 @pytest.mark.parametrize(
@@ -407,6 +483,39 @@ def test_pathfield(qtbot: QtBot, click_attrs: dict, value: str, expected: str):
     assert realpath(widget.get_widget_value()) == realpath(expected)
 
 
+def test_textfield_set_none_disables_widget_and_empty_checks_text():
+    param = click.Option(["--p"], **ClickAttrs.textfield())
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.TextField = control.widget_registry[cli.name][param.name]
+
+    assert widget.is_empty() is True
+    widget.set_value("abc")
+    assert widget.is_empty() is False
+
+    widget.set_value(None)
+    assert widget.is_enabled is False
+
+
+def test_pathfield_buffered_reader_shows_stdin_and_empty_cmdline(tmp_path):
+    param = click.Option(["--p"], **ClickAttrs.filefield(type_dict={"mode": "rb"}))
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.FileField = control.widget_registry[cli.name][param.name]
+
+    widget.set_value("")
+    assert widget.get_widget_value_cmdline() == ""
+
+    path = tmp_path / "input.bin"
+    path.write_bytes(b"clickqt")
+    with path.open("rb") as handle:
+        widget.set_value(handle)
+
+    assert widget.get_widget_value() == "-"
+
+
 @pytest.mark.parametrize(
     ("click_attrs", "value", "add_children", "remove_children"),
     [
@@ -444,3 +553,56 @@ def test_nvaluewidget_add_remove_children(
         widget.remove_button_pair(list(widget.buttondict.keys())[0])
 
     assert len(widget.children) == amount_children - remove_children
+
+
+def test_qcheckable_combobox_lineedit_event_filter_and_timer(qtbot: QtBot):
+    combo = QCheckableComboBox()
+    combo.addItems(["A", "B"])
+    qtbot.addWidget(combo)
+    combo.model().item(0).setCheckState(Qt.CheckState.Checked)
+    combo.lineEdit().setText("stale")
+
+    assert combo.eventFilter(combo.lineEdit(), QEvent(QEvent.Type.Wheel))
+
+    assert combo.closeOnLineEditClick is False
+    assert combo.eventFilter(combo.lineEdit(), QEvent(QEvent.Type.MouseButtonRelease))
+    assert combo.closeOnLineEditClick is True
+
+    assert combo.eventFilter(combo.lineEdit(), QEvent(QEvent.Type.MouseButtonRelease))
+    assert combo.lineEdit().text() == "A"
+
+    combo.timerEvent(QTimerEvent(12345))
+    assert combo.closeOnLineEditClick is False
+
+
+def test_qcheckable_combobox_viewport_toggle_and_resize(qtbot: QtBot):
+    class MouseReleaseAt(QEvent):
+        def __init__(self, pos):
+            super().__init__(QEvent.Type.MouseButtonRelease)
+            self._pos = pos
+
+        def pos(self):
+            return self._pos
+
+    combo = QCheckableComboBox()
+    combo.addItems(["alpha", "beta"])
+    combo.resize(220, 32)
+    qtbot.addWidget(combo)
+    combo.show()
+    combo.showPopup()
+    qtbot.wait(20)
+
+    index = combo.model().index(0, 0)
+    event = MouseReleaseAt(combo.view().visualRect(index).center())
+
+    assert combo.model().item(0).checkState() == Qt.CheckState.Unchecked
+    assert combo.eventFilter(combo.view().viewport(), event)
+    assert combo.model().item(0).checkState() == Qt.CheckState.Checked
+
+    assert combo.eventFilter(combo.view().viewport(), event)
+    assert combo.model().item(0).checkState() == Qt.CheckState.Unchecked
+
+    combo.model().item(0).setCheckState(Qt.CheckState.Checked)
+    combo.lineEdit().setText("stale")
+    combo.resizeEvent(QResizeEvent(combo.size(), combo.size()))
+    assert combo.lineEdit().text() == "alpha"

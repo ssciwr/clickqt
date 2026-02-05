@@ -7,7 +7,8 @@ import pytest
 import click
 from click.testing import CliRunner
 from pytest import MonkeyPatch
-from PySide6.QtWidgets import QMessageBox, QInputDialog
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox, QInputDialog, QSizePolicy
 
 import clickqt.widgets
 from clickqt.core.error import ClickQtError
@@ -20,6 +21,61 @@ def callback(p):
     if STATE["clickqt_res"] is None:
         STATE["clickqt_res"] = p
     return p
+
+
+@pytest.mark.parametrize(
+    ("error_type", "trigger", "raw_message", "expected_message"),
+    [
+        (ClickQtError.ErrorType.NO_ERROR, "value", "x", ""),
+        (
+            ClickQtError.ErrorType.CONFIRMATION_INPUT_NOT_EQUAL_ERROR,
+            "password",
+            "x",
+            "Confirmation input (password) is not equal",
+        ),
+        (ClickQtError.ErrorType.ABORTED_ERROR, "value", "x", "Aborted!"),
+        (
+            ClickQtError.ErrorType.PROCESSING_VALUE_ERROR,
+            "value",
+            "boom",
+            "Processing value error (value): boom",
+        ),
+        (
+            ClickQtError.ErrorType.CONVERTING_ERROR,
+            "value",
+            "boom",
+            "Converting error (value): boom",
+        ),
+        (
+            ClickQtError.ErrorType.REQUIRED_ERROR,
+            "value",
+            "option",
+            "Required error (value): option is empty",
+        ),
+        (ClickQtError.ErrorType.EXIT_ERROR, "value", "x", ""),
+    ],
+)
+def test_clickqt_error_message_matches_error_intent(
+    error_type: ClickQtError.ErrorType,
+    trigger: str,
+    raw_message: str,
+    expected_message: str,
+):
+    error = ClickQtError(error_type, trigger, raw_message)
+
+    assert error.message() == expected_message
+
+
+def test_clickqt_error_unknown_type_raises_not_implemented():
+    class UnknownErrorType:
+        value = 99
+
+    error = ClickQtError(UnknownErrorType())
+
+    with pytest.raises(NotImplementedError) as excinfo:
+        error.message()
+
+    assert "99" in str(excinfo.value)
 
 
 def prepare_execution(
@@ -337,6 +393,37 @@ def test_execution_confirmation_widget_fail(
     assert val is None and err.type == error.type
 
 
+def test_confirmation_widget_returns_deterministic_conversion_error(tmp_path):
+    valid_path = tmp_path / "valid.txt"
+    valid_path.write_text("ok", encoding="utf-8")
+    invalid_first = str(tmp_path / "missing-first")
+    invalid_second = str(tmp_path / "missing-second")
+
+    param = click.Option(
+        ["--p"], type=click.Path(exists=True), **ClickAttrs.confirmation_widget()
+    )
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.ConfirmationWidget = control.widget_registry[cli.name][
+        param.name
+    ]
+
+    widget.field.set_value(str(valid_path))
+    widget.confirmation_field.set_value(invalid_second)
+    val, err = widget.get_value()
+    assert val is None
+    assert err.type == ClickQtError.ErrorType.CONVERTING_ERROR
+    assert os.path.basename(invalid_second) in err.message()
+
+    widget.field.set_value(invalid_first)
+    widget.confirmation_field.set_value(invalid_second)
+    val, err = widget.get_value()
+    assert val is None
+    assert err.type == ClickQtError.ErrorType.CONVERTING_ERROR
+    assert os.path.basename(invalid_first) in err.message()
+
+
 @pytest.mark.parametrize(
     ("click_attrs", "value", "envvar_values"),
     [
@@ -381,6 +468,124 @@ def test_execution_nvalue_widget(
             control.gui.run_button.click()
             wait_process_Events(1)  # Wait for worker thread to finish the execution
             val = STATE["clickqt_res"]
+
+
+def test_nvalue_widget_add_button_reenables_disabled_widget():
+    param = click.Option(["--p"], **ClickAttrs.nvalue_widget())
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.NValueWidget = control.widget_registry[cli.name][param.name]
+
+    assert widget.is_enabled is False
+    add_button = widget.vbox.layout().itemAt(0).widget()
+    add_button.click()
+
+    assert len(widget.children) == 1
+    assert widget.is_enabled is True
+
+
+def test_nvalue_widget_add_pair_calls_reenable_branch(monkeypatch: MonkeyPatch):
+    param = click.Option(["--p"], **ClickAttrs.nvalue_widget())
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.NValueWidget = control.widget_registry[cli.name][param.name]
+
+    calls: list[bool | None] = []
+    original_set_enabled_changeable = widget.set_enabled_changeable
+
+    def set_enabled_changeable_stub(enabled=None, changeable=None):
+        calls.append(enabled)
+        if len(calls) == 1:
+            return
+        original_set_enabled_changeable(enabled=enabled, changeable=changeable)
+
+    monkeypatch.setattr(widget, "set_enabled_changeable", set_enabled_changeable_stub)
+
+    widget.add_pair()
+
+    assert len(widget.children) == 1
+    assert calls == [True, True]
+    assert widget.is_enabled is True
+
+
+def test_nvalue_widget_required_without_values_returns_required_error():
+    param = click.Option(["--p"], **ClickAttrs.nvalue_widget(required=True))
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.NValueWidget = control.widget_registry[cli.name][param.name]
+
+    value, error = widget.get_value()
+
+    assert value is None
+    assert error.type == ClickQtError.ErrorType.REQUIRED_ERROR
+
+
+def test_nvalue_widget_empty_default_and_none_set_value_mean_no_values():
+    param = click.Option(["--p"], **ClickAttrs.nvalue_widget(default=[]))
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.NValueWidget = control.widget_registry[cli.name][param.name]
+
+    value, error = widget.get_value()
+    assert value == ()
+    assert error.type == ClickQtError.ErrorType.NO_ERROR
+
+    widget.add_pair("value")
+    assert len(widget.children) == 1
+
+    widget.set_value(None)
+    assert len(widget.children) == 0
+
+
+def test_multiwidget_metavar_updates_child_labels_and_none_disables_widget():
+    param = click.Option(["--pair"], nargs=2, metavar=("left", "right"))
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.MultiValueWidget = control.widget_registry[cli.name][
+        param.name
+    ]
+
+    assert [child.label.text() for child in widget.children] == ["left:", "right:"]
+    for child in widget.children:
+        assert child.layout.alignment() == Qt.AlignmentFlag.AlignLeft
+        policy = child.widget.sizePolicy()
+        assert policy.horizontalPolicy() == QSizePolicy.Policy.Expanding
+        assert policy.verticalPolicy() == QSizePolicy.Policy.Fixed
+
+    widget.set_enabled_changeable(enabled=True)
+    widget.set_value(None)
+    assert widget.is_enabled is False
+
+
+def test_multiwidget_with_no_metavar_removes_child_labels():
+    param = click.Option(["--pair"], **ClickAttrs.tuple_widget(types=(str, int)))
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.TupleWidget = control.widget_registry[cli.name][param.name]
+
+    assert all(child.layout.indexOf(child.label) == -1 for child in widget.children)
+
+
+def test_multiwidget_is_empty_reflects_child_values():
+    param = click.Option(["--value"], **ClickAttrs.nvalue_widget())
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.NValueWidget = control.widget_registry[cli.name][param.name]
+
+    assert widget.is_empty() is True
+
+    widget.add_pair("abc")
+    assert widget.is_empty() is False
+
+    widget.add_pair("")
+    assert widget.is_empty() is True
 
 
 def test_execution_context():

@@ -2,8 +2,16 @@ import enum
 import click
 import pytest
 from click_option_group import OptionGroup
+import clickqt.widgets
 from clickqt import qtgui_from_click
 from clickqt.core.control import Control
+from clickqt.core.error import ClickQtError
+from clickqt.widgets.styles import (
+    BLOB_BUTTON_STYLE_DISABLED,
+    BLOB_BUTTON_STYLE_DISABLED_FORCED,
+    BLOB_BUTTON_STYLE_ENABLED,
+    BLOB_BUTTON_STYLE_ENABLED_FORCED,
+)
 from tests.testutils import ClickAttrs
 
 
@@ -16,6 +24,27 @@ def ensure_cmdstr(control: Control, template: str):
     control.construct_command_string()
     cmdstr = control.get_clipboard()
     assert cmdstr == template
+
+
+@pytest.mark.parametrize(
+    ("style_factory", "base_color", "hover_color"),
+    [
+        (BLOB_BUTTON_STYLE_ENABLED, "#0f0", "#9f9"),
+        (BLOB_BUTTON_STYLE_DISABLED, "#f00", "#f99"),
+        (BLOB_BUTTON_STYLE_ENABLED_FORCED, "#696", "#898"),
+        (BLOB_BUTTON_STYLE_DISABLED_FORCED, "#966", "#988"),
+    ],
+)
+def test_blob_button_styles_embed_palette_and_geometry(
+    style_factory, base_color: str, hover_color: str
+):
+    radius = 7
+    stylesheet = style_factory(radius)
+
+    assert "QToolButton" in stylesheet
+    assert f"background-color: {base_color}" in stylesheet
+    assert f"background-color: {hover_color}" in stylesheet
+    assert f"border-radius: {radius}px" in stylesheet
 
 
 @pytest.mark.parametrize("eptype", [EPTYPE.OPT_GROUPS, EPTYPE.STANDARD])
@@ -83,3 +112,50 @@ def test_disable(eptype, attrs, value, template):
     ensure_cmdstr(control, expected_disabled)
     widget.set_enabled_changeable(enabled=True)
     ensure_cmdstr(control, expected_enabled)
+
+
+def test_required_widget_disabled_state_reports_required_error():
+    param = click.Option(["--count"], **ClickAttrs.intfield(required=True))
+    cli = click.Command("cli", params=[param])
+
+    control = qtgui_from_click(cli)
+    widget: clickqt.widgets.IntField = control.widget_registry[cli.name][param.name]
+
+    assert widget.is_empty() is False
+
+    widget.set_enabled_changeable(enabled=False)
+    value, error = widget.get_value()
+
+    assert value is None
+    assert error.type == ClickQtError.ErrorType.REQUIRED_ERROR
+    assert widget.enabled_button.toolTip() == "Disabled: This option cannot be used."
+
+
+def test_checkbox_with_help_removes_help_label_from_layout():
+    param = click.Option(
+        ["--check"], help="Displayed as checkbox help", **ClickAttrs.checkbox()
+    )
+    cli = click.Command("cli", params=[param])
+
+    control = qtgui_from_click(cli)
+    widget: clickqt.widgets.CheckBox = control.widget_registry[cli.name][param.name]
+
+    assert hasattr(widget, "help_label")
+    assert widget.layout.indexOf(widget.help_label) == -1
+    assert widget.help_label.text() == "Displayed as checkbox help"
+
+
+def test_checkbox_flag_set_value_toggles_enabled_state():
+    param = click.Option(["--flag"], **ClickAttrs.checkbox(is_flag=True))
+    cli = click.Command("cli", params=[param])
+
+    control = qtgui_from_click(cli)
+    widget: clickqt.widgets.CheckBox = control.widget_registry[cli.name][param.name]
+
+    widget.set_value(True)
+    assert widget.is_enabled is True
+    assert widget.get_widget_value() is True
+
+    widget.set_value(False)
+    assert widget.is_enabled is False
+    assert widget.get_widget_value() is False
