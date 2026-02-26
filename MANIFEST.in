@@ -1,4 +1,0 @@
-# https://packaging.python.org/guides/using-manifest-in/
-graft clickqt
-global-exclude __pycache__
-global-exclude *.py[cod]
