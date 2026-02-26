@@ -77,8 +77,8 @@ def textio_to_str_to_list(vals):
         ),
         (
             ClickAttrs.nvalue_widget(type=(click.types.File(), int)),
-            [[".gitignore", 12], ["setup.py", -1]],
-            [["setup.py", 10], ["README.md", 1]],
+            [[".gitignore", 12], ["pyproject.toml", -1]],
+            [["pyproject.toml", 10], ["README.md", 1]],
         ),
     ],
 )
