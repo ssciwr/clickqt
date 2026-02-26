@@ -79,8 +79,8 @@ def prepare_execution(cmd: click.Command, cmd_group_name: click.Group):
         ),
         (
             ClickAttrs.nvalue_widget(type=(click.types.File(), int)),
-            [[".gitignore", 12], ["setup.py", -1]],
-            "--p .gitignore 12 --p setup.py -1",
+            [[".gitignore", 12], ["pyproject.toml", -1]],
+            "--p .gitignore 12 --p pyproject.toml -1",
         ),
         (ClickAttrs.countwidget(), 3, "--p --p --p"),
     ],
