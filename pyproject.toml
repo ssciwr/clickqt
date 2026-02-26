@@ -40,13 +40,6 @@ tests = [
     "pytest-cov",
     "pytest-qt",
 ]
-docs = [
-    "sphinx",
-    "sphinx_mdinclude",
-    "sphinx_rtd_theme",
-    "enum-tools[sphinx]",
-    "sphinx_qt_documentation",
-]
 
 # The external "standalone" version
 [project.scripts]
