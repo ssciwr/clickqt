@@ -17,6 +17,7 @@ from PySide6.QtCore import QTimer, Signal, QObject, Qt, QEvent, QTimerEvent
 from PySide6.QtGui import QResizeEvent
 from pytestqt.qtbot import QtBot
 
+from clickqt_utils.extensions import PathWithExtensions
 from clickqt.basedint import BasedIntParamType
 from clickqt.widgets.core import QCheckableComboBox
 from tests.testutils import ClickAttrs
@@ -122,6 +123,10 @@ def test_based_int_type_convert_raises_bad_parameter_for_invalid_value(raw_value
         (ClickAttrs.floatrange(), clickqt.widgets.RealField),
         (ClickAttrs.filefield(), clickqt.widgets.FileField),
         (ClickAttrs.filepathfield(), clickqt.widgets.FilePathField),
+        (
+            {"type": PathWithExtensions(file_extensions=["txt"])},
+            clickqt.widgets.FilePathField,
+        ),
         (ClickAttrs.nvalue_widget(), clickqt.widgets.NValueWidget),
         (
             ClickAttrs.tuple_widget(types=(click.types.Path(), int)),
@@ -337,6 +342,46 @@ def test_passwordfield_showPassword():
         passwordfield_widget.show_hide_action.setChecked(
             not passwordfield_widget.show_hide_action.isChecked()
         )
+
+
+def test_path_with_extensions_forces_file_only_mode():
+    param = click.Option(
+        param_decls=["--p"],
+        type=PathWithExtensions(
+            exists=True,
+            file_extensions=["txt"],
+            dir_okay=True,
+        ),
+    )
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.FilePathField = control.widget_registry[cli.name][param.name]
+
+    assert widget.file_type == clickqt.widgets.PathField.FileType.File
+
+
+def test_path_with_extensions_builds_dialog_name_filters():
+    param = click.Option(
+        param_decls=["--p"],
+        type=PathWithExtensions(
+            exists=False,
+            file_extensions={
+                ("png", ".jpeg"): "Images",
+                ("txt",): "Text Files",
+            },
+        ),
+    )
+    cli = click.Command("cli", params=[param])
+
+    control = clickqt.qtgui_from_click(cli)
+    widget: clickqt.widgets.FilePathField = control.widget_registry[cli.name][param.name]
+
+    assert widget._build_name_filters() == [
+        "All Supported (*.png *.jpeg *.txt)",
+        "Images (*.png *.jpeg)",
+        "Text Files (*.txt)",
+    ]
 
 
 @pytest.mark.skipif(

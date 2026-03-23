@@ -12,6 +12,7 @@
 - Launch GUIs for already installed CLIs (or from a Python file) via `clickqtfy`.
 - Ship a GUI for your Python package with three lines of code
 - Map common `click` types to Qt widgets, including `bool`, `int`, `float`, `str`, `Choice`, `DateTime`, `Path`, `File`, tuple, `nargs`, and `multiple`.
+- Support custom parameters provided in [clickqt-utils](https://github.com/ssciwr/clickqt-utils), e.g.`PathWithExtensions`
 - Support for hierarchically nested `click.Group`s
 - Carry over defaults, required flags, callbacks, and envvar-based initialization.
 - Execute your command from the GUI and stream stdout/stderr to an in-app terminal panel.
