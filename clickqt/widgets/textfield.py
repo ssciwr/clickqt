@@ -8,6 +8,7 @@ from io import TextIOWrapper, BufferedReader
 import click
 from PySide6.QtWidgets import QLineEdit, QPushButton, QFileDialog, QHBoxLayout, QWidget
 from PySide6.QtCore import QDir
+from clickqt_utils.extensions import PathWithExtensions
 
 from clickqt.widgets.core.QPathDialog import QPathDialog
 from clickqt.widgets.basewidget import BaseWidget
@@ -144,6 +145,9 @@ class PathField(TextField):
                     dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
                 else:
                     dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+                name_filters = self._build_name_filters()
+                if name_filters:
+                    dialog.setNameFilters(name_filters)
             else:  # Only FilePathField can be here
                 dialog.setFileMode(QFileDialog.FileMode.Directory)
                 dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
@@ -159,3 +163,23 @@ class PathField(TextField):
         if self.is_empty():
             return ""
         return f"{self.get_preferable_opt()} {shlex.quote(str(self.get_widget_value()))} ".lstrip()
+
+    def _build_name_filters(self) -> list[str]:
+        if not isinstance(self.type, PathWithExtensions):
+            return []
+
+        grouped_filters: list[str] = []
+        all_patterns: list[str] = []
+
+        for extensions, group_name in self.type.file_extension_groups:
+            if not extensions:
+                continue
+            patterns = [f"*{extension}" for extension in extensions]
+            grouped_filters.append(f"{group_name} ({' '.join(patterns)})")
+            all_patterns.extend(patterns)
+
+        if len(grouped_filters) <= 1:
+            return grouped_filters
+
+        all_supported = f"All Supported ({' '.join(dict.fromkeys(all_patterns))})"
+        return [all_supported, *grouped_filters]

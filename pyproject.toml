@@ -28,6 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "click>=8,<9",
+    "clickqt-utils",
     "click_option_group",
     "PySide6",
     "qt-collapsible-section-pyside6",

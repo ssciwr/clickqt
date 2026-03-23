@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import click
 from PySide6.QtWidgets import QLineEdit
+from clickqt_utils.extensions import PathWithExtensions
 
 from clickqt.widgets.textfield import PathField
 
@@ -33,10 +34,17 @@ class FilePathField(PathField):
         #   :attr:`~clickqt.widgets.textfield.PathField.FileType.Directory`
         #: depending on **otype**\.file_okay and **otype**\.dir_okay.
         self.file_type: PathField.FileType
-        self.file_type |= PathField.FileType.File if otype.file_okay else self.file_type
-        self.file_type |= (
-            PathField.FileType.Directory if otype.dir_okay else self.file_type
-        )
+        if isinstance(otype, PathWithExtensions):
+            # PathWithExtensions always validates file extensions and rejects
+            # directories, so the GUI must only expose file selection.
+            self.file_type = PathField.FileType.File
+        else:
+            self.file_type |= (
+                PathField.FileType.File if otype.file_okay else self.file_type
+            )
+            self.file_type |= (
+                PathField.FileType.Directory if otype.dir_okay else self.file_type
+            )
 
         assert (
             self.file_type != PathField.FileType.Unknown
